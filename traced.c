@@ -29,6 +29,7 @@ int main(void)
 {
     int i;
     for (i = 0; i < 3; ++i){
+        printf("haha to see\n");
         catch_me();
     }
     printf(">_<~!\n");

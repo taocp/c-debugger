@@ -52,8 +52,11 @@ struct xibugger_breakpoint *get_breakpoints(pid_t pid)
 {
     struct xibugger_breakpoint *bp = (struct xibugger_breakpoint*)malloc(sizeof(struct xibugger_breakpoint));
     assert(bp!=NULL);
+
+    procprint("enter breakpoint addr:");
+    scanf("%x", &bp->addr);
     // dirty hack
-    bp->addr = 0x804843C;
+    //bp->addr = 0x804846A;
     // now, get origanl
     bp->ins  = ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0);
     procprint("target orig instruction:%08X\n", bp->ins);
