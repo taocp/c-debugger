@@ -20,9 +20,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
+#include <string.h>
 #include <sys/wait.h>
 #include <sys/ptrace.h>
 #include <sys/user.h>
+
+#define XIBUGGER_CMD_LEN 10
 
 int procprint(const char *format, ...)
 {
@@ -48,16 +51,22 @@ struct xibugger_breakpoint{
     int ins;//original instruction
 };
 
+inline int get_instruction(pid_t pid, int addr)
+{
+    return ptrace(PTRACE_PEEKTEXT, pid, (void*)addr, 0);
+}
+
 struct xibugger_breakpoint *get_breakpoints(pid_t pid)
 {
     struct xibugger_breakpoint *bp = (struct xibugger_breakpoint*)malloc(sizeof(struct xibugger_breakpoint));
     assert(bp!=NULL);
 
     procprint("enter breakpoint addr:");
-    scanf("%x", &bp->addr);
-    // dirty hack
-    //bp->addr = 0x804846A;
-    // now, get origanl
+    bp->addr = 0x0804843c;
+    // scanf("%x", &bp->addr);
+    // TODO check input
+
+    // now, get origanl instruction
     bp->ins  = ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0);
     procprint("target orig instruction:%08X\n", bp->ins);
     
@@ -66,6 +75,8 @@ struct xibugger_breakpoint *get_breakpoints(pid_t pid)
     procprint("target new  instruction:%08X\n", ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0));
     return bp;
 }
+
+
 
 void execute_beforebreak(pid_t pid, struct user_regs_struct *regs,  struct xibugger_breakpoint *bps)
 {
@@ -91,48 +102,97 @@ void restore_breakpoints(pid_t pid, struct xibugger_breakpoint *bps)
     ptrace(PTRACE_POKETEXT, pid, (void*)bps->addr, (bps->ins&0xFFFFFF00)|0xCC);
 }
 
+void eatendline(void)
+{
+    while(getchar()!='\n'){
+        ;
+    }
+}
+
+
 void run_debugger(pid_t pid)
 {
     int status;
-    int count=0;
+    //int count=0;
     struct user_regs_struct regs;
 
     // wait target stoped at 1st instruction
     wait(&status);
 
-    // get breakpoint, support only 1 breakpoint now. Oops
-    struct xibugger_breakpoint *breakpoints = get_breakpoints(pid);    
+    struct xibugger_breakpoint *breakpoints;    
 
     ptrace(PTRACE_GETREGS, pid, 0, &regs);
     procprint("target start at : %08X\n", regs.eip);
 
-    // wait for target stop at breakpoint
-    ptrace(PTRACE_CONT, pid, 0, 0);
-    wait(0);
-    
-    while(WIFSTOPPED(status)){
+    char cmd[XIBUGGER_CMD_LEN]="";
+    int  is_running = 0; // The program is not being run.
+    do{
         procprint("");
 
-        while(getchar()!='\n'){
-            ;
+        if(  EOF == scanf("%s", cmd) ){
+            procprint("over\n");
+            break;
         }
-    
-        // we replace the 1st bytes of orignal instruction into '0xCC'
-        // now, we retore it back and execute the orignal instruction.
-        execute_beforebreak(pid, &regs, breakpoints);
+        if( !strcmp(cmd, "b") ){
+             // get breakpoint, support only 1 breakpoint now. Oops
+             breakpoints = get_breakpoints(pid);    
+             continue; // get next cmd
+        }
+        else if( !strcmp(cmd, "c") ){
+            if( is_running != 1 ){
+                procprint("The program is not being run.\n");
+                continue;
+            }
+            // we had replaced the 1st bytes of orignal instruction into '0xCC'
+            // now, we retore it back and execute the orignal instruction.
+            execute_beforebreak(pid, &regs, breakpoints);
 
-        count++;
-        
-        // retore the breakpoint
-        // breakpoint is always valid unless user delete it.
-        restore_breakpoints(pid, breakpoints);
+            // retore the breakpoint
+            // breakpoint is always valid unless user delete it.
+            restore_breakpoints(pid, breakpoints);
+            ptrace(PTRACE_CONT, pid, 0, 0);
+            wait(&status);
+            if( !WIFSTOPPED(status) ){
+                procprint("over\n");
+                break;
+            }
+            //procprint("current eip:%x\n", get_instruction(pid, breakpoints->addr));
+        }
+        // FIXME should use cmd 'n' only once when target is stopped at breakpoint
+        else if( !strcmp(cmd, "n") ){
+            if( is_running != 1 ){
+                procprint("The program is not being run.\n");
+                continue;
+            }
+            // we had replaced the 1st bytes of orignal instruction into '0xCC'
+            // now, we retore it back and execute the orignal instruction.
+            execute_beforebreak(pid, &regs, breakpoints);
 
+            // retore the breakpoint
+            // breakpoint is always valid unless user delete it.
+            restore_breakpoints(pid, breakpoints);
+            // procprint("current eip:%x\n", get_instruction(pid, breakpoints->addr));
+        }
+        else if( !strcmp(cmd, "r") ){
+            is_running = 1;// being run.
+            ptrace(PTRACE_CONT, pid, 0, 0);
+            wait(&status);
+            if( !WIFSTOPPED(status) ){
+                procprint("over\n");
+                break;
+            }
+            //procprint("current eip:%x\n", get_instruction(pid, breakpoints->addr));
+        }
+        else {
+            procprint("no support for this operation\n");
+            eatendline();
+            continue;
+        }
+        eatendline();
 
-        // target continue, wait for next come across breakpoint or exited
-        ptrace(PTRACE_CONT, pid, 0, 0);
-        wait(&status);
     }
-    procprint("child executed %d instructions\n", count);
+    while(WIFSTOPPED(status));
+    //procprint("child executed %d instructions\n", count);
 }
 
 

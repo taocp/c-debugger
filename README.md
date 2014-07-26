@@ -28,6 +28,7 @@ use `objdump -d your-target` get the address of breakpoint you want.
 
 
 ## todo
+
 multiple breakpoint
 
 delete breakpoint
@@ -39,3 +40,5 @@ break with line-number and function name
 `b xxx` => set breakpoint
 
 `c` => continue
+
+cmd readline library support
