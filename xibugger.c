@@ -75,7 +75,6 @@ void execute_beforebreak(pid_t pid, struct user_regs_struct *regs,  struct xibug
     regs->eip = bps->addr;// reset to orignal addr
     ptrace(PTRACE_SETREGS, pid, 0, regs);
     if(ptrace(PTRACE_SINGLESTEP, pid, 0, 0) < 0){
-    //if(ptrace(PTRACE_CONT, pid, 0, 0) < 0){
         perror("error execute_beforebreak:ptrace()\n");
         return ;
     }
