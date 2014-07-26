@@ -19,7 +19,6 @@
 #include <stdio.h>
 #include <assert.h>
 
-//0804843c
 void catch_me(void)
 {
     printf("Oop... \n");
@@ -29,7 +28,6 @@ int main(void)
 {
     int i;
     for (i = 0; i < 3; ++i){
-        printf("haha to see\n");
         catch_me();
     }
     printf(">_<~!\n");
