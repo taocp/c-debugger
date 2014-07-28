@@ -22,8 +22,10 @@
 #include <assert.h>
 #include <string.h>
 #include <sys/wait.h>
-#include <sys/ptrace.h>
 #include <sys/user.h>
+#include <sys/ptrace.h>
+
+#include "lib/datastruct.h"
 
 #define XIBUGGER_CMD_LEN 10
 
@@ -56,11 +58,12 @@ void xibugger_wait(pid_t pid)
 
 void run_target(const char *name)
 {
-    procprint("target start!\n");
     if(ptrace(PTRACE_TRACEME, 0, 0, 0) < 0){
         perror("error ptrace()\n");
     }
-    execl(name, name, NULL);
+    if( execl(name, name, NULL) == -1 ){
+        procprint("cannot execute the target\n");
+    }
 }
 
 //  debugger get targe's eip
@@ -147,17 +150,15 @@ void eatendline(void)
 
 void run_debugger(pid_t pid)
 {
-    int status;
-    //int count=0;
     struct user_regs_struct regs;
 
     // wait target stoped at 1st instruction
-    wait(&status);
+    xibugger_wait(pid);
 
     struct xibugger_breakpoint *breakpoints;    
 
     ptrace(PTRACE_GETREGS, pid, 0, &regs);
-    procprint("target start at : %08X\n", regs.eip);
+//    procprint("target start at : %08X\n", regs.eip);
 
     int  why_stop = 0;// why_stop == 0: come across breakpoint
                       // why_stop == 1: single step (press `n`)
@@ -169,7 +170,7 @@ void run_debugger(pid_t pid)
         procprint("");
 
         // TODO just press ENTER repeat last operate
-        if(  EOF == scanf("%s", cmd) ){
+        if( EOF == scanf("%s", cmd) ){
             procprint("over\n");
             break;
         }
@@ -233,12 +234,12 @@ void run_debugger(pid_t pid)
         }
         eatendline();
 
-    }while(WIFSTOPPED(status));
+    }while(1);
 }
-
 
 int main(int argc, char *argv[])
 {
+    char *get_func_addr = "./lib/dwarf_get_func_addr";
     if(argc != 2){
         printf("usage:%s target\n", argv[0]);
         return -1;
@@ -250,7 +251,17 @@ int main(int argc, char *argv[])
     }
     else if (pid > 0){
         // parent(debugger)
-        run_debugger(pid);
+        pid_t pid2 = fork();
+        if( pid2 == 0 ){
+            // get target function-name : address infos
+            execl(get_func_addr, get_func_addr, NULL);
+        }
+        else if( pid2 > 0 ){
+            run_debugger(pid);
+        }
+        else{
+            perror("error fork()\n");
+        }
     }
     else{
         perror("error fork()\n");

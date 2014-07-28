@@ -2,7 +2,7 @@ CFLAGS=-g -Wall
 
 all:xibugger traced
 
-xibugger:xibugger.c 
+xibugger:xibugger.c ./lib/list.c
 
 traced:traced.c
 
