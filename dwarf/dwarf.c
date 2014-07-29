@@ -17,6 +17,9 @@
 #include <dwarf.h>
 #include <libdwarf.h>
 
+#include "dwarf.h"
+
+const char *suffix = ".func_addr";
 
 void die(char* fmt, ...)
 {
@@ -128,15 +131,13 @@ void list_funcs_in_file(Dwarf_Debug dbg, FILE *fp)
     }
 }
 
-#define FILENAME_LEN 50 
 
-int main(int argc, char** argv)
+int dwarf(int argc, char** argv)
 {
     Dwarf_Debug dbg = 0;
     Dwarf_Error err;
     const char* progname;
-    char filename[FILENAME_LEN];
-    char *suffix = ".func_addr";
+    char filename[TARGET_NAME_LEN];
     int fd = -1;
     FILE *fp = NULL;
 
@@ -151,7 +152,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    strncpy(filename, progname, FILENAME_LEN - strlen(suffix) - 1);
+    strncpy(filename, progname, TARGET_NAME_LEN - strlen(suffix) - 1);
     strncat(filename, suffix, strlen(suffix));
     if ((fp = fopen(filename, "w")) < 0){
         perror("open");
@@ -164,6 +165,7 @@ int main(int argc, char** argv)
     }
 
     list_funcs_in_file(dbg, fp);
+    fclose(fp);
 
     if (dwarf_finish(dbg, &err) != DW_DLV_OK) {
         fprintf(stderr, "Failed DWARF finalization\n");

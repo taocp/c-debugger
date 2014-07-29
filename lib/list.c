@@ -24,6 +24,10 @@
 /*
  * return 0 : successful
  * return -1: error with bad args
+ *
+ * ================================================================
+ * NOTE: the link list MUST **initialized to NULL** : *list == NULL
+ * ================================================================
  */
 int list_add(struct list_node **list, void *pdata)
 {
@@ -51,8 +55,8 @@ int list_add(struct list_node **list, void *pdata)
 #if 0
 int main(void)
 {
-    struct list_node *alist1=NULL;
-    struct list_node *alist2=NULL;
+    struct list_node *alist1 = NULL; // must inited to NULL
+    struct list_node *alist2 = NULL;
     int a1 = 3;
     int a2 = 5;
     double b1 = 5.5;

@@ -23,7 +23,14 @@ struct list_node {
     struct list_node *next;
 };
 
-
+/*
+ * return 0 : successful
+ * return -1: error with bad args
+ *
+ * ================================================================
+ * NOTE: the link list MUST **initialized to NULL** : *list == NULL
+ * ================================================================
+ */
 int list_add(struct list_node **list, void *pdata);
 
 #endif

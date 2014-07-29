@@ -26,12 +26,21 @@
 #include <sys/ptrace.h>
 
 #include "lib/datastruct.h"
+#include "dwarf/dwarf.h"
 
 #define XIBUGGER_CMD_LEN 10
 
 struct xibugger_breakpoint{
     int addr;// the address of breakpoint
     int ins; //original instruction, we change it's 1st byte into '0xCC'
+};
+
+// http://stackoverflow.com/questions/2352209/max-identifier-length
+#define FUNC_NAME_LEN 63
+
+struct func_name_addr{
+    char name[FUNC_NAME_LEN];
+    int  addr;
 };
 
 //  just like printf(), but add a header: [pid]
@@ -237,9 +246,42 @@ void run_debugger(pid_t pid)
     }while(1);
 }
 
+struct list_node *func_addr(char *target)
+{
+    assert(target);
+    char filename[FUNC_NAME_LEN];
+    FILE *fp;
+    strncpy(filename, target, FUNC_NAME_LEN - strlen(suffix) - 1);
+    strncat(filename, suffix, strlen(suffix));
+    if ((fp = fopen(filename, "r")) < 0){
+        return NULL;
+    }
+    char fun_name[FUNC_NAME_LEN];
+    int  addr;
+    struct func_name_addr *pdata = NULL;
+    struct list_node *h=NULL;
+    while( EOF != fscanf(fp, "%s%x", fun_name, &addr) ){
+        pdata = (struct func_name_addr*)malloc(sizeof(struct func_name_addr));
+        assert(pdata);
+        strncpy(pdata->name, fun_name, FUNC_NAME_LEN);
+        pdata->addr = addr;
+        list_add(&h, pdata);
+    }
+
+    struct list_node *s=h;
+    while(s){
+        printf(
+                "%s : %x\n",
+                ((struct func_name_addr*)s->pdata)->name,
+                ((struct func_name_addr*)s->pdata)->addr
+        );
+        s = s->next;
+    }
+    return h;
+}
+
 int main(int argc, char *argv[])
 {
-    char *get_func_addr = "./lib/dwarf_get_func_addr";
     if(argc != 2){
         printf("usage:%s target\n", argv[0]);
         return -1;
@@ -251,17 +293,14 @@ int main(int argc, char *argv[])
     }
     else if (pid > 0){
         // parent(debugger)
-        pid_t pid2 = fork();
-        if( pid2 == 0 ){
-            // get target function-name : address infos
-            execl(get_func_addr, get_func_addr, NULL);
+        char *dwarf_argv[] = { "dwarf", argv[1] };
+        if( dwarf(2, dwarf_argv) != 0 ){
+            perror("cannot read debug infos.\ncompile with -g option?\n");
+            return -1;
         }
-        else if( pid2 > 0 ){
-            run_debugger(pid);
-        }
-        else{
-            perror("error fork()\n");
-        }
+        struct list_node *func_list = func_addr(argv[1]);
+        assert(func_list);
+        run_debugger(pid);
     }
     else{
         perror("error fork()\n");
