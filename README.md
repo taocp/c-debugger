@@ -1,8 +1,7 @@
 # xibugger
 
-### a simple debugger, a toy, a demo.
+### a simple C debugger, a toy, a demo.
 
-## environment
 written for 32 bit Linux(x86). These code is closely related to OS and architecture.
 
 ## reference
@@ -11,23 +10,21 @@ xibugger is originally written based on code from [here](http://eli.thegreenplac
 ## how to run
 `make`
 
-`make run`
+`./xibugger your-target` ( make sure target compiled with `-g` option )
 
 **note** support only *one* breakpoint now. and have to enter breakpoint-address instread of line-number or 
 function name. 
-
-use `objdump -d your-target` get the address of breakpoint you want.
 
 
 ### example
 
 `make`
 
-`objdump -d traced | grep catch_me`, note the address of function catch\_me().
-
 `make run`
 
-setting breakpoint : `b the-address`
+this debugger would print `function-name : address`
+
+setting breakpoint : `b address`
 
 when the debugger is being run,
 
@@ -41,10 +38,3 @@ break with line-number and function name
 delete breakpoint
 
 cmd readline library support
-
-
-
-
-
-
-

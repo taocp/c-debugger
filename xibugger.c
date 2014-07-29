@@ -157,7 +157,7 @@ void eatendline(void)
     }
 }
 
-void run_debugger(pid_t pid)
+void run_debugger(pid_t pid, struct list_node *func_list)
 {
     struct user_regs_struct regs;
 
@@ -300,7 +300,7 @@ int main(int argc, char *argv[])
         }
         struct list_node *func_list = func_addr(argv[1]);
         assert(func_list);
-        run_debugger(pid);
+        run_debugger(pid, func_list);
     }
     else{
         perror("error fork()\n");
