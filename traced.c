@@ -19,17 +19,27 @@
 #include <stdio.h>
 #include <assert.h>
 
-void catch_me(void)
+void catch(void)
 {
-    printf("Oop... \n");
+    printf("catch\n");
+}
+
+void capture(void)
+{
+    printf("capture\n");
+}
+
+void grip(void)
+{
+    printf("grip\n");
 }
  
 int main(void)
 {
-    int i;
-    for (i = 0; i < 3; ++i){
-        catch_me();
-    }
+    grip();
+    catch();
+    capture();
+    catch();
     printf(">_<~!\n");
     return 0;
 }

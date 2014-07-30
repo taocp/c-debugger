@@ -90,7 +90,7 @@ inline int get_instruction(pid_t pid, int addr)
 }
 
 // TODO support multiple breakpoint
-struct xibugger_breakpoint *get_breakpoints(pid_t pid)
+struct xibugger_breakpoint *get_breakpoints(pid_t pid, struct list_node *list)
 {
     struct xibugger_breakpoint *bp = (struct xibugger_breakpoint*)malloc(sizeof(struct xibugger_breakpoint));
     assert(bp!=NULL);
@@ -157,76 +157,139 @@ void eatendline(void)
     }
 }
 
+int search_func_byname(struct list_node *s, void *data)
+{
+    return !strncmp( ((struct func_name_addr *)s->pdata)->name,
+                     ((struct func_name_addr *)data)->name,
+                     FUNC_NAME_LEN ) ;
+}
+
+int search_func_byaddr(struct list_node *s, void *data)
+{
+    return  ((struct func_name_addr *)s->pdata)->addr == (int)data;
+}
+
+/*
+ * address is the unique identifier of a breakpoint.
+ */
+int search_bps(struct list_node *node, void *eip)
+{
+    return ((struct xibugger_breakpoint*)node->pdata)->addr == (int)eip;
+}
+
+int traverse_bps(struct list_node *bp)
+{
+    printf("%x\n", ((struct xibugger_breakpoint*)bp->pdata)->addr);
+    return 0; // TODO how about void ?
+}
+
+struct xibugger_breakpoint *which_breakpoint(pid_t pid, struct list_node *bps_list)
+{
+    int eip = get_eip(pid);
+    eip -= 1; // had execute the instruction '0xCC', go back a step
+    struct list_node *s = list_search(bps_list, search_bps, (void*)eip);
+    assert(s);
+    return (struct xibugger_breakpoint*)(s->pdata);
+}
+
+struct xibugger_breakpoint *construct_breakpoint(pid_t pid, int addr)
+{
+    struct xibugger_breakpoint *bp = (struct xibugger_breakpoint*)malloc(sizeof(struct xibugger_breakpoint));
+    assert(bp!=NULL);
+    bp->addr = addr;
+    bp->ins  = ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0);
+    procprint("orignal instruction:%08X\n", bp->ins);
+    ptrace(PTRACE_POKETEXT, pid, (void*)bp->addr, (bp->ins&0xFFFFFF00)|0xCC);
+    procprint("new     instruction:%08X\n", ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0));
+    return bp;
+}
+
+void prompt_break(pid_t pid, struct list_node *bps_list, struct list_node *func_list)
+{
+    struct xibugger_breakpoint *breakpoint = which_breakpoint(pid, bps_list);
+    struct list_node *name_addr = list_search(func_list, search_func_byaddr, (void*)breakpoint->addr);
+    assert(name_addr);
+    procprint("breakpoint : %s\n", ((struct func_name_addr*)name_addr->pdata)->name);
+}
+
 void run_debugger(pid_t pid, struct list_node *func_list)
 {
     struct user_regs_struct regs;
 
-    // wait target stoped at 1st instruction
+//  wait target stoped at 1st instruction
     xibugger_wait(pid);
 
-    struct xibugger_breakpoint *breakpoints;    
+    struct xibugger_breakpoint *breakpoint;    
 
-    ptrace(PTRACE_GETREGS, pid, 0, &regs);
+//    ptrace(PTRACE_GETREGS, pid, 0, &regs);
 //    procprint("target start at : %08X\n", regs.eip);
 
     int  why_stop = 0;// why_stop == 0: come across breakpoint
-                      // why_stop == 1: single step (press `n`)
+                      // why_stop == 1: single step (such as after pressing `n`)
 
+    struct list_node *bps_list = NULL; // breakpoints list
     char cmd[XIBUGGER_CMD_LEN]="";
     int  is_running = 0; // The program is not being run.
-    int  is_hadbreakpoint = 0;
     do{
         procprint("");
-
+        
         // TODO just press ENTER repeat last operate
         if( EOF == scanf("%s", cmd) ){
-            procprint("over\n");
+            procprint("done\n");
             break;
         }
-        if( !strcmp(cmd, "b") ){
-            if(is_hadbreakpoint == 1){
-                procprint("support only 1 breakpoint now.\n");
-                eatendline();
-                continue;
+        if( !strncmp(cmd, "b", XIBUGGER_CMD_LEN) ){ // set breakpoint
+            char name[FUNC_NAME_LEN];
+            scanf("%s", name);
+            struct list_node *name_addr = list_search(func_list, search_func_byname, (void*)name);
+            if(name_addr){
+                struct xibugger_breakpoint *bp = construct_breakpoint(pid, ((struct func_name_addr*)name_addr->pdata)->addr);
+                list_add(&bps_list, bp);
             }
-            // get breakpoint, support only 1 breakpoint now. Oops
-            breakpoints = get_breakpoints(pid);
-            is_hadbreakpoint = 1;
+            else{
+                procprint("cannot found function:%s(...).\n", name); 
+            }
             eatendline();
             continue; // get next cmd
         }
-        else if( !strcmp(cmd, "p") ){
+//        else if( !strncmp(cmd, "l", XIBUGGER_CMD_LEN) ){
+//            list_traverse(bps_list, traverse_bps);
+//        }
+        else if( !strncmp(cmd, "p", XIBUGGER_CMD_LEN) ){ // print target's current instruction & eip
             proc_ins_eip(pid);
         }
-        else if( !strcmp(cmd, "c") ){
+        else if( !strncmp(cmd, "c", XIBUGGER_CMD_LEN) ){ // continue
             if( is_running != 1 ){
                 procprint("The program is not being run.\n");
                 eatendline();
                 continue;
             }
             if(why_stop == 0){
-                dance_on_breakpoint(pid, &regs, breakpoints);
+                breakpoint = which_breakpoint(pid, bps_list);
+                dance_on_breakpoint(pid, &regs, breakpoint);
             }
             ptrace(PTRACE_CONT, pid, 0, 0);
             xibugger_wait(pid);
             why_stop = 0;
-            //procprint("current ins:%x\n", get_instruction(pid, breakpoints->addr));
+            
+            prompt_break(pid, bps_list, func_list);
         }
-        else if( !strcmp(cmd, "n") ){
+        else if( !strncmp(cmd, "n", XIBUGGER_CMD_LEN) ){ // next step
             if( is_running != 1 ){
                 procprint("The program is not being run.\n");
                 eatendline();
                 continue;
             }
             if(why_stop == 0){
-                dance_on_breakpoint(pid, &regs, breakpoints);
+                breakpoint = which_breakpoint(pid, bps_list);
+                dance_on_breakpoint(pid, &regs, breakpoint);
                 why_stop = 1;
             }
             else{
                 execute_singlestep(pid);
             }
         }
-        else if( !strcmp(cmd, "r") ){
+        else if( !strncmp(cmd, "r", XIBUGGER_CMD_LEN) ){ // start to run the target
             if(is_running == 1){
                 procprint("target is being run\n");
                 eatendline();
@@ -235,6 +298,7 @@ void run_debugger(pid_t pid, struct list_node *func_list)
             is_running = 1;
             ptrace(PTRACE_CONT, pid, 0, 0);
             xibugger_wait(pid);
+            prompt_break(pid, bps_list, func_list);
         }
         else {
             procprint("no support for this operation\n");
@@ -268,15 +332,17 @@ struct list_node *func_addr(char *target)
         list_add(&h, pdata);
     }
 
-    struct list_node *s=h;
-    while(s){
-        printf(
-                "%s : %x\n",
-                ((struct func_name_addr*)s->pdata)->name,
-                ((struct func_name_addr*)s->pdata)->addr
-        );
-        s = s->next;
-    }
+// uncomment this block code if need prompt function-name : address.
+//    struct list_node *s=h;
+//    while(s){
+//        printf(
+//                "%s : %x\n",
+//                ((struct func_name_addr*)s->pdata)->name,
+//                ((struct func_name_addr*)s->pdata)->addr
+//        );
+//        s = s->next;
+//    }
+
     return h;
 }
 
