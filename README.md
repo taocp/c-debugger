@@ -27,4 +27,4 @@ cmd readline library support
 docs:how this debugger work
 
 ## reference
-xibugger is originally written based on code from [here](http://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1/) by Eli Bendersky under the public domain. Most if not all of the code has been rewritten. xibugger is licensed under "GPL v2" license.
+a simple debugger is originally written based on code from [here](http://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1/) by Eli Bendersky under the public domain. Most if not all of the code has been rewritten. xibugger is licensed under "GPL v2" license.
