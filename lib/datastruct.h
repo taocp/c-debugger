@@ -3,15 +3,15 @@
  *
  *       Filename:  datastruct.h
  *
- *    Description:  
+ *    Description:
  *
  *        Version:  1.0
  *        Created:  07/28/2014 11:22:35 AM
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  
- *   Organization:  
+ *         Author:
+ *   Organization:
  *
  * =====================================================================================
  */
@@ -36,5 +36,10 @@ int list_add(struct list_node **list, void *pdata);
 struct list_node *list_search(struct list_node *list, int (*pfun)(struct list_node *, void *), void *data);
 
 void list_traverse(struct list_node *list, int (*handle_func)(struct list_node *));
+
+
+void list_delete_byfeature(struct list_node **list, int(*pfun)(struct list_node *, void *), void *data);
+
+void list_destroy(struct list_node **list);
 
 #endif

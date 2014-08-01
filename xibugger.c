@@ -10,8 +10,8 @@
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  
- *   Organization:  
+ *         Author:
+ *   Organization:
  *
  * =====================================================================================
  */
@@ -61,6 +61,18 @@ void xibugger_wait(pid_t pid)
     wait(&status);
     if( !WIFSTOPPED(status) ){
         procprint("target exited\n");
+        /*
+         * should free the breakpoints-list & func-name-addr-list
+         * but it seems hard to implement this in here
+         *
+         * however, exit(0) would cause malloced memory to give back to OS,
+         * so, we don't free() by hands.
+         *
+         * malloc()生成的断点链表/函数名地址链表应该及时释放
+         * 但在这里不便于实现
+         *
+         * 无论如何，exit(0)都会把内存还给操作系统的，这里就暂且不手动free()了。
+         */
         exit(0);
     }
 }
@@ -100,7 +112,7 @@ struct xibugger_breakpoint *get_breakpoints(pid_t pid, struct list_node *list)
 
     bp->ins  = ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0);
     procprint("target orignal instruction:%08X\n", bp->ins);
-    
+
     ptrace(PTRACE_POKETEXT, pid, (void*)bp->addr, (bp->ins&0xFFFFFF00)|0xCC);
     procprint("target new  instruction:%08X\n", ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0));
     return bp;
@@ -109,7 +121,7 @@ struct xibugger_breakpoint *get_breakpoints(pid_t pid, struct list_node *list)
 void proc_ins_eip(pid_t pid)
 {
     procprint(
-            "current ins:%x, current eip:%x\n", 
+            "current ins:%x, current eip:%x\n",
             get_instruction(pid, get_eip(pid)),
             get_eip(pid)
     );
@@ -130,7 +142,7 @@ void execute_singlestep(pid_t pid)
  * example
  * the orignal instruction is : 0xcd80
  * debugger set a breakpoint on it, so it became into : 0xcc80
- * 
+ *
  * this function change 0xcc80 into 0xcd80
  * and execute the orignal instruction 0xcd80
  * at the end, change 0xcd80 into 0xcc80
@@ -183,6 +195,7 @@ int traverse_bps(struct list_node *bp)
     return 0; // TODO how about void ?
 }
 
+// find the target stopped on which breakpoint when it break
 struct xibugger_breakpoint *which_breakpoint(pid_t pid, struct list_node *bps_list)
 {
     int eip = get_eip(pid);
@@ -212,6 +225,19 @@ void prompt_break(pid_t pid, struct list_node *bps_list, struct list_node *func_
     procprint("breakpoint : %s\n", ((struct func_name_addr*)name_addr->pdata)->name);
 }
 
+int is_delete_bp(struct list_node *list, void *data)
+{
+//printf("is_delete_bp:%x %x\n",((struct xibugger_breakpoint*)list->pdata)->addr, (int)data);
+    return ((struct xibugger_breakpoint*)list->pdata)->addr == (int)data;
+}
+
+// for search
+int is_breakpoint(struct list_node *list, void *data)
+{
+//    printf("is_breakpoint:%x %x\n",((struct xibugger_breakpoint*)list->pdata)->addr, (int)data);
+    return ((struct xibugger_breakpoint*)list->pdata)->addr == (int)data;
+}
+
 void run_debugger(pid_t pid, struct list_node *func_list)
 {
     struct user_regs_struct regs;
@@ -219,7 +245,7 @@ void run_debugger(pid_t pid, struct list_node *func_list)
 //  wait target stoped at 1st instruction
     xibugger_wait(pid);
 
-    struct xibugger_breakpoint *breakpoint;    
+    struct xibugger_breakpoint *breakpoint;
 
 //    ptrace(PTRACE_GETREGS, pid, 0, &regs);
 //    procprint("target start at : %08X\n", regs.eip);
@@ -232,7 +258,7 @@ void run_debugger(pid_t pid, struct list_node *func_list)
     int  is_running = 0; // The program is not being run.
     do{
         procprint("");
-        
+
         // TODO just press ENTER repeat last operate
         if( EOF == scanf("%s", cmd) ){
             procprint("done\n");
@@ -247,8 +273,31 @@ void run_debugger(pid_t pid, struct list_node *func_list)
                 list_add(&bps_list, bp);
             }
             else{
-                procprint("cannot found function:%s(...).\n", name); 
+                procprint("cannot found function:%s(...).\n", name);
             }
+            eatendline();
+            continue; // get next cmd
+        }
+        else if( !strncmp(cmd, "d", XIBUGGER_CMD_LEN) ){ // delete a breakpoint
+            char name[FUNC_NAME_LEN];
+            scanf("%s", name);
+            struct list_node *name_addr = list_search(func_list, search_func_byname, (void*)name);
+            if(name_addr){
+                // printf("to delete addr:%x\n", ((struct func_name_addr*)name_addr->pdata)->addr);
+                struct list_node *bp = list_search(bps_list, is_breakpoint, (void*)((struct func_name_addr*)name_addr->pdata)->addr);
+                if(bp){
+                    printf("addr:%x, ins:%x\n",((struct xibugger_breakpoint*)bp->pdata)->addr, ((struct xibugger_breakpoint*)bp->pdata)->ins);
+                    ptrace(PTRACE_POKETEXT, pid, (void*)((struct xibugger_breakpoint*)bp->pdata)->addr, ((struct xibugger_breakpoint*)bp->pdata)->ins);
+                    list_delete_byfeature(&bps_list, is_delete_bp, (void*)((struct func_name_addr*)name_addr->pdata)->addr);
+                }
+                else{
+                    procprint("cannot found breakpoint:%s(...).\n", name);
+                }
+            }
+            else{
+                procprint("cannot found function:%s(...).\n", name);
+            }
+            why_stop = 1;// TODO comments
             eatendline();
             continue; // get next cmd
         }
@@ -271,7 +320,7 @@ void run_debugger(pid_t pid, struct list_node *func_list)
             ptrace(PTRACE_CONT, pid, 0, 0);
             xibugger_wait(pid);
             why_stop = 0;
-            
+
             prompt_break(pid, bps_list, func_list);
         }
         else if( !strncmp(cmd, "n", XIBUGGER_CMD_LEN) ){ // next step
@@ -308,6 +357,8 @@ void run_debugger(pid_t pid, struct list_node *func_list)
         eatendline();
 
     }while(1);
+    list_destroy(&bps_list);
+    list_destroy(&func_list);
 }
 
 struct list_node *func_addr(char *target)
@@ -333,15 +384,15 @@ struct list_node *func_addr(char *target)
     }
 
 // uncomment this block code if need prompt function-name : address.
-//    struct list_node *s=h;
-//    while(s){
-//        printf(
-//                "%s : %x\n",
-//                ((struct func_name_addr*)s->pdata)->name,
-//                ((struct func_name_addr*)s->pdata)->addr
-//        );
-//        s = s->next;
-//    }
+    struct list_node *s=h;
+    while(s){
+        printf(
+                "%s : %x\n",
+                ((struct func_name_addr*)s->pdata)->name,
+                ((struct func_name_addr*)s->pdata)->addr
+        );
+        s = s->next;
+    }
 
     return h;
 }
