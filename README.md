@@ -20,11 +20,13 @@ I test it on Gentoo(x86). `gcc version 4.7.3`.
 
 break with line-number ~~and function name~~
 
-delete breakpoint
+~~delete breakpoint~~
 
 cmd readline library support
 
 docs:how this debugger work
+
+Seems it's necessary to reconstruct. Oops...
 
 ## reference
 a simple debugger is originally written based on code from [here](http://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1/) by Eli Bendersky under the public domain. Most if not all of the code has been rewritten. xibugger is licensed under "GPL v2" license.
