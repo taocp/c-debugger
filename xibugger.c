@@ -30,7 +30,7 @@
 
 #define XIBUGGER_CMD_LEN 10
 
-struct xibugger_breakpoint{
+struct breakpoint_t{
     int addr;// the address of breakpoint
     int ins; //original instruction, we change it's 1st byte into '0xCC'
 };
@@ -38,7 +38,7 @@ struct xibugger_breakpoint{
 // http://stackoverflow.com/questions/2352209/max-identifier-length
 #define FUNC_NAME_LEN 63
 
-struct func_name_addr{
+struct func_info_t{
     char name[FUNC_NAME_LEN];
     int  addr;
 };
@@ -99,9 +99,9 @@ inline int get_instruction(pid_t pid, int addr)
 }
 
 // TODO support multiple breakpoint
-struct xibugger_breakpoint *get_breakpoints(pid_t pid, struct list_node *list)
+struct breakpoint_t *get_breakpoints(pid_t pid, struct list_node *list)
 {
-    struct xibugger_breakpoint *bp = (struct xibugger_breakpoint*)malloc(sizeof(struct xibugger_breakpoint));
+    struct breakpoint_t *bp = (struct breakpoint_t*)malloc(sizeof(struct breakpoint_t));
     assert(bp!=NULL);
 
     scanf("%x", &bp->addr);
@@ -144,7 +144,7 @@ void execute_singlestep(pid_t pid)
  * and execute the orignal instruction 0xcd80
  * at the end, change 0xcd80 into 0xcc80
  */
-void dance_on_breakpoint(pid_t pid, struct user_regs_struct *regs, struct xibugger_breakpoint *bps)
+void dance_on_breakpoint(pid_t pid, struct user_regs_struct *regs, struct breakpoint_t *bps)
 {
     // we had replaced the 1st bytes of orignal instruction into '0xCC'
     // now, we retore it back and execute the orignal instruction.
@@ -172,19 +172,19 @@ int search_bps(struct list_node *node, void *eip);
 int traverse_bps(struct list_node *bp);
 
 // find the target stopped on which breakpoint when it break
-struct xibugger_breakpoint *which_breakpoint(pid_t pid, struct list_node *bps_list)
+struct breakpoint_t *which_breakpoint(pid_t pid, struct list_node *bps_list)
 {
     int eip = get_eip(pid);
     eip -= 1; // had execute the instruction '0xCC', go back a step
     struct list_node *s = list_search(bps_list, search_bps, (void*)eip);
-    //procprint("%x : %x\n", ((struct xibugger_breakpoint*)(s->pdata))->addr, ((struct xibugger_breakpoint*)(s->pdata))->ins);
+    //procprint("%x : %x\n", ((struct breakpoint_t*)(s->pdata))->addr, ((struct breakpoint_t*)(s->pdata))->ins);
     assert(s);
-    return (struct xibugger_breakpoint*)(s->pdata);
+    return (struct breakpoint_t*)(s->pdata);
 }
 
-struct xibugger_breakpoint *construct_breakpoint(pid_t pid, int addr)
+struct breakpoint_t *construct_breakpoint(pid_t pid, int addr)
 {
-    struct xibugger_breakpoint *bp = (struct xibugger_breakpoint*)malloc(sizeof(struct xibugger_breakpoint));
+    struct breakpoint_t *bp = (struct breakpoint_t*)malloc(sizeof(struct breakpoint_t));
     assert(bp!=NULL);
     bp->addr = addr;
     bp->ins  = ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0);
@@ -196,21 +196,21 @@ struct xibugger_breakpoint *construct_breakpoint(pid_t pid, int addr)
 
 void prompt_break(pid_t pid, struct list_node *bps_list, struct list_node *func_list)
 {
-    struct xibugger_breakpoint *breakpoint = which_breakpoint(pid, bps_list);
+    struct breakpoint_t *breakpoint = which_breakpoint(pid, bps_list);
     struct list_node *name_addr = list_search(func_list, search_func_byaddr, (void*)breakpoint->addr);
     assert(name_addr);
-    procprint("breakpoint : %s\n", ((struct func_name_addr*)name_addr->pdata)->name);
+    procprint("breakpoint : %s\n", ((struct func_info_t*)name_addr->pdata)->name);
 }
 
 int is_delete_bp(struct list_node *list, void *data)
 {
-    return ((struct xibugger_breakpoint*)list->pdata)->addr == (int)data;
+    return ((struct breakpoint_t*)list->pdata)->addr == (int)data;
 }
 
 // for search
 int is_breakpoint(struct list_node *list, void *data)
 {
-    return ((struct xibugger_breakpoint*)list->pdata)->addr == (int)data;
+    return ((struct breakpoint_t*)list->pdata)->addr == (int)data;
 }
 
 #define COME_ACROSS_BREAKPOINT 0
@@ -223,9 +223,9 @@ void run_debugger(pid_t pid, struct list_node *func_list)
     int status;
     wait(&status);
 
-    struct xibugger_breakpoint *breakpoint;
-    int  why_stop = COME_ACROSS_BREAKPOINT;// 0: come across breakpoint
-                                           // 1: single step (such as after pressing `n`)
+    struct breakpoint_t *breakpoint;
+    int  why_stop = COME_ACROSS_BREAKPOINT;//  come across breakpoint
+                                           // or single step (such as after pressing `n`)
 
     struct list_node *bps_list = NULL; // breakpoints list
     char cmd[XIBUGGER_CMD_LEN]="";
@@ -242,11 +242,11 @@ void run_debugger(pid_t pid, struct list_node *func_list)
             scanf("%s", name);
             struct list_node *name_addr = list_search(func_list, search_func_byname, (void*)name);
             if(name_addr){
-                struct xibugger_breakpoint *bp = construct_breakpoint(pid, ((struct func_name_addr*)name_addr->pdata)->addr);
+                struct breakpoint_t *bp = construct_breakpoint(pid, ((struct func_info_t*)name_addr->pdata)->addr);
                 list_add(&bps_list, bp);
             }
             else{
-                procprint("cannot found function:%s(...).\n", name);
+                procprint("cannot found function:%s(...)\n", name);
             }
             eatendline();
             continue; // get next cmd
@@ -256,10 +256,10 @@ void run_debugger(pid_t pid, struct list_node *func_list)
             scanf("%s", name);
             struct list_node *name_addr = list_search(func_list, search_func_byname, (void*)name);
             if(name_addr){
-                struct list_node *bp = list_search(bps_list, is_breakpoint, (void*)((struct func_name_addr*)name_addr->pdata)->addr);
+                struct list_node *bp = list_search(bps_list, is_breakpoint, (void*)((struct func_info_t*)name_addr->pdata)->addr);
                 if(bp){
-                    ptrace(PTRACE_POKETEXT, pid, (void*)((struct xibugger_breakpoint*)bp->pdata)->addr, ((struct xibugger_breakpoint*)bp->pdata)->ins);
-                    list_delete_byfeature(&bps_list, is_delete_bp, (void*)((struct func_name_addr*)name_addr->pdata)->addr);
+                    ptrace(PTRACE_POKETEXT, pid, (void*)((struct breakpoint_t*)bp->pdata)->addr, ((struct breakpoint_t*)bp->pdata)->ins);
+                    list_delete_byfeature(&bps_list, is_delete_bp, (void*)((struct func_info_t*)name_addr->pdata)->addr);
                 }
                 else{
                     procprint("cannot found breakpoint:%s(...).\n", name);
@@ -275,7 +275,7 @@ void run_debugger(pid_t pid, struct list_node *func_list)
         else if( !strncmp(cmd, "lbp", XIBUGGER_CMD_LEN) ){ // list breakpoints
             list_traverse(bps_list, traverse_bps);
         }
-        else if( !strncmp(cmd, "p", XIBUGGER_CMD_LEN) ){ // print target's current instruction & eip
+        else if( !strncmp(cmd, "i", XIBUGGER_CMD_LEN) ){ // print target's current instruction & eip
             proc_ins_eip(pid);
         }
         else if( !strncmp(cmd, "c", XIBUGGER_CMD_LEN) ){ // continue
@@ -343,10 +343,10 @@ struct list_node *func_addr(char *target)
     }
     char fun_name[FUNC_NAME_LEN];
     int  addr;
-    struct func_name_addr *pdata = NULL;
+    struct func_info_t *pdata = NULL;
     struct list_node *h=NULL;
     while( EOF != fscanf(fp, "%s%x", fun_name, &addr) ){
-        pdata = (struct func_name_addr*)malloc(sizeof(struct func_name_addr));
+        pdata = (struct func_info_t*)malloc(sizeof(struct func_info_t));
         assert(pdata);
         strncpy(pdata->name, fun_name, FUNC_NAME_LEN);
         pdata->addr = addr;
@@ -358,8 +358,8 @@ struct list_node *func_addr(char *target)
     while(s){
         printf(
                 "%s : %x\n",
-                ((struct func_name_addr*)s->pdata)->name,
-                ((struct func_name_addr*)s->pdata)->addr
+                ((struct func_info_t*)s->pdata)->name,
+                ((struct func_info_t*)s->pdata)->addr
         );
         s = s->next;
     }
@@ -401,14 +401,14 @@ int main(int argc, char *argv[])
 
 int search_func_byname(struct list_node *s, void *data)
 {
-    return !strncmp( ((struct func_name_addr *)s->pdata)->name,
-                     ((struct func_name_addr *)data)->name,
+    return !strncmp( ((struct func_info_t *)s->pdata)->name,
+                     ((struct func_info_t *)data)->name,
                      FUNC_NAME_LEN ) ;
 }
 
 int search_func_byaddr(struct list_node *s, void *data)
 {
-    return  ((struct func_name_addr *)s->pdata)->addr == (int)data;
+    return  ((struct func_info_t *)s->pdata)->addr == (int)data;
 }
 
 /*
@@ -416,12 +416,12 @@ int search_func_byaddr(struct list_node *s, void *data)
  */
 int search_bps(struct list_node *node, void *eip)
 {
-    return ((struct xibugger_breakpoint*)node->pdata)->addr == (int)eip;
+    return ((struct breakpoint_t*)node->pdata)->addr == (int)eip;
 }
 
 int traverse_bps(struct list_node *bp)
 {
-    printf("%x\n", ((struct xibugger_breakpoint*)bp->pdata)->addr);
+    printf("%x\n", ((struct breakpoint_t*)bp->pdata)->addr);
     return 0;
 }
 

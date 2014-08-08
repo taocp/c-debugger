@@ -37,7 +37,6 @@ struct list_node *list_search(struct list_node *list, int (*pfun)(struct list_no
 
 void list_traverse(struct list_node *list, int (*handle_func)(struct list_node *));
 
-
 void list_delete_byfeature(struct list_node **list, int(*pfun)(struct list_node *, void *), void *data);
 
 void list_destroy(struct list_node **list);
