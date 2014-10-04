@@ -381,10 +381,20 @@ int main(int argc, char *argv[])
     else if (pid > 0){
         // parent(debugger)
         char *dwarf_argv[] = { "dwarf", argv[1] };
+        /*
+         * dwarf() search target's (function-name : address), save them in a file
+         * example:
+         *  main 0x80486b4
+         *  foo  0x8048623
+         *  bar  0x8048233
+         *  ...
+         */
         if( dwarf(2, dwarf_argv) != 0 ){
             perror("cannot read debug infos.\ncompile with -g option?\n");
             return -1;
         }
+
+        // read file for getting all (function-name : address), save them in a link list
         struct list_node *func_list = func_addr(argv[1]);
         assert(func_list);
         run_debugger(pid, func_list);
