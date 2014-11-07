@@ -8,7 +8,7 @@ so, `n` in this debugger means next CPU instruction intead of C code.
 
 ---
 
-###  `#define COME_ACROSS_BREAKPOINT 0`
+###  #define COME_ACROSS_BREAKPOINT 0
 
 original instructions:
 ```
