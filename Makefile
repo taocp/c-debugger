@@ -1,13 +1,13 @@
 CFLAGS=-g -Wall
 
-all:xibugger traced
+all:debugger traced
 
-xibugger:xibugger.c ./lib/list.c ./dwarf/dwarf.c -lelf -ldwarf
+debugger:debugger.c ./lib/list.c ./dwarf/dwarf.c -lelf -ldwarf
 
 traced:traced.c
 
 run:
-	./xibugger traced
+	./debugger traced
 
 clean:
-	rm -f ./xibugger ./traced ./traced.func_addr
+	rm -f ./debugger ./traced ./traced.func_addr

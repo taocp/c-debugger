@@ -1,4 +1,4 @@
-# xibugger
+# debugger
 
 ### a simple C debugger, a toy, a demo.
 
@@ -25,7 +25,7 @@ break with line-number ~~and function name~~
 ~~docs:how this debugger work~~
 
 ## reference
-a simple debugger is originally written based on code from [here](http://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1/) by Eli Bendersky under the public domain. Most if not all of the code has been rewritten. xibugger is licensed under "GPL v2" license.
+a simple debugger is originally written based on code from [here](http://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1/) by Eli Bendersky under the public domain. Most if not all of the code has been rewritten. debugger is licensed under "GPL v2" license.
 
 blogs
 
