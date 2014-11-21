@@ -3,7 +3,7 @@
  *
  *       Filename:  xibugger.c
  *
- *    Description:  a simple debugger, a toy, a demo.
+ *    Description:  a simple C debugger.
  *
  *        Version:  1.0
  *        Created:  07/17/2014 09:42:50 AM
@@ -110,24 +110,6 @@ inline int get_instruction(pid_t pid, int addr)
 {
     return ptrace(PTRACE_PEEKTEXT, pid, (void*)addr, 0);
 }
-
-/* //no longer need
-struct breakpoint_t *get_breakpoints(pid_t pid, struct list_node *list)
-{
-    struct breakpoint_t *bp = (struct breakpoint_t*)malloc(sizeof(struct breakpoint_t));
-    assert(bp!=NULL);
-
-    scanf("%x", &bp->addr);
-    // TODO check input
-
-    bp->ins  = ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0);
-    procprint("target orignal instruction:%08X\n", bp->ins);
-
-    ptrace(PTRACE_POKETEXT, pid, (void*)bp->addr, (bp->ins&0xFFFFFF00)|0xCC);
-    procprint("target new  instruction:%08X\n", ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0));
-    return bp;
-}
-*/
 
 void proc_ins_eip(pid_t pid)
 {
@@ -241,19 +223,16 @@ void cmd_delete_breakpoint(pid_t pid, struct list_node **bps_list, struct list_n
     char name[FUNC_NAME_LEN];
     scanf("%s", name);
     struct list_node *func = list_search(func_list, search_func_byname, (void*)name);
-    if(func){
-        struct list_node *bp = list_search(*bps_list, is_breakpoint,(void*)FUNC_ADDR(func));
-        if(bp){
-            ptrace(PTRACE_POKETEXT, pid, (void*)BREAKPOINT_ADDR(bp), (void*)BREAKPOINT_INS(bp));
-            list_delete_byfeature(bps_list, is_delete_bp, (void*)FUNC_ADDR(func));
-        }
-        else{
-            procprint("cannot found breakpoint:%s(...).\n", name);
-        }
-    }
-    else{
+    if(func == NULL){
         procprint("cannot found function:%s(...).\n", name);
+        return ;
     }
+    struct list_node *bp = list_search(*bps_list, is_breakpoint,(void*)FUNC_ADDR(func));
+    if(bp == NULL){
+        procprint("cannot found breakpoint:%s(...).\n", name);
+    }
+    ptrace(PTRACE_POKETEXT, pid, (void*)BREAKPOINT_ADDR(bp), (void*)BREAKPOINT_INS(bp));
+    list_delete_byfeature(bps_list, is_delete_bp, (void*)FUNC_ADDR(func));
 }
 
 void cmd_list_breakpoinst(struct list_node *bps_list)
@@ -324,7 +303,7 @@ void run_debugger(pid_t pid, struct list_node *func_list)
     struct list_node *bps_list = NULL; // breakpoints list
     char cmd[XIBUGGER_CMD_LEN]="";
     int  is_running = 0; // The program is not being run.
-    do{
+    while(1){
         procprint("");
         if( EOF == scanf("%s", cmd) ){
             procprint("done\n");
@@ -386,7 +365,7 @@ void run_debugger(pid_t pid, struct list_node *func_list)
         }
         eatendline();
 
-    }while(1);
+    }
     list_destroy(&bps_list);
     list_destroy(&func_list);
 }
@@ -420,7 +399,7 @@ struct list_node *func_addr(char *target)
                 "%s : %x\n",
                 ((struct func_info_t*)s->pdata)->name,
                 ((struct func_info_t*)s->pdata)->addr
-        );
+              );
         s = s->next;
     }
 
@@ -472,8 +451,8 @@ int main(int argc, char *argv[])
 int search_func_byname(struct list_node *s, void *data)
 {
     return !strncmp( ((struct func_info_t *)s->pdata)->name,
-                     ((struct func_info_t *)data)->name,
-                     FUNC_NAME_LEN ) ;
+            ((struct func_info_t *)data)->name,
+            FUNC_NAME_LEN ) ;
 }
 
 int search_func_byaddr(struct list_node *s, void *data)
