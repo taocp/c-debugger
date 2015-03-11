@@ -15,9 +15,10 @@
  *
  * =====================================================================================
  */
-#include <stdlib.h>
-#include <stdio.h>
 #include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "datastruct.h"
 
 /*

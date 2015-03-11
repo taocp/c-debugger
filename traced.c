@@ -1,23 +1,24 @@
 /*
  * =====================================================================================
  *
- *       Filename:
+ *       Filename:  traced.c
  *
- *    Description:  
+ *    Description:  a test for debugger.
+ *                  this isn't a part of debugger.
  *
  *        Version:  1.0
  *        Created:  07/16/2014 04:54:41 PM
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  
- *   Organization:  
+ *         Author:
+ *   Organization:
  *
  * =====================================================================================
  */
-#include <stdlib.h>
-#include <stdio.h>
 #include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 void catch(void)
 {
@@ -33,7 +34,7 @@ void grip(void)
 {
     printf("grip\n");
 }
- 
+
 int main(void)
 {
     grip();

@@ -15,18 +15,18 @@
  *
  * =====================================================================================
  */
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <assert.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
-#include <sys/user.h>
 #include <sys/ptrace.h>
+#include <sys/user.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
-#include "lib/datastruct.h"
 #include "dwarf/dwarf.h"
+#include "lib/datastruct.h"
 
 #define XIBUGGER_CMD_LEN 10
 

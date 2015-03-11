@@ -2,7 +2,7 @@
 
 ### a simple C debugger, a toy, a demo.
 
-written for 32bits Linux. These code is closely related to OS and architecture.
+written for 32-bit Linux. These code is closely related to OS and architecture.
 
 I test it on Gentoo(x86). `gcc version 4.7.3`.
 
@@ -27,7 +27,7 @@ break with line-number ~~and function name~~
 ## reference
 a simple debugger is originally written based on code from [here](http://eli.thegreenplace.net/2011/01/23/how-debuggers-work-part-1/) by Eli Bendersky under the public domain. Most if not all of the code has been rewritten. debugger is licensed under "GPL v2" license.
 
-blogs
+blogs:
 
 English version:
 
