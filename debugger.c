@@ -180,9 +180,9 @@ struct breakpoint_t *construct_breakpoint(pid_t pid, int addr)
     assert(bp!=NULL);
     bp->addr = addr;
     bp->ins  = ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0);
-    procprint("orignal instruction:%08X\n", bp->ins);
+    //procprint("orignal instruction:%08X\n", bp->ins);
     ptrace(PTRACE_POKETEXT, pid, (void*)bp->addr, (bp->ins&0xFFFFFF00)|0xCC);
-    procprint("new     instruction:%08X\n", ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0));
+    //procprint("new     instruction:%08X\n", ptrace(PTRACE_PEEKTEXT, pid, (void*)bp->addr, 0));
     return bp;
 }
 
@@ -280,8 +280,8 @@ void cmd_help(void)
 {
     printf(
         "just like gdb.\n"
-        "b -- set breakpoint, # b foo\n"
-        "d -- delete breakpoint, # b foo\n"
+        "b -- set breakpoint, e.g. b funcion_name\n"
+        "d -- delete breakpoint, e.g. b funcion_name\n"
         "i -- display target's current instruction & eip\n"
         "c -- continue\n"
         "n -- next CPU instruction\n"
@@ -302,7 +302,7 @@ void run_debugger(pid_t pid, struct list_node *func_list)
 
     struct list_node *bps_list = NULL; // breakpoints list
     char cmd[XIBUGGER_CMD_LEN]="";
-    int  is_running = 0; // The program is not being run.
+    int  is_running = 0; // is the program/target/tracee running
     while(1){
         procprint("");
         if( EOF == scanf("%s", cmd) ){
@@ -392,16 +392,15 @@ struct list_node *func_addr(char *target)
         list_add(&h, pdata);
     }
 
-    // uncomment this block code if need prompt function-name : address.
+    printf("===hints===\n");
     struct list_node *s=h;
     while(s){
-        printf(
-                "%s : %x\n",
-                ((struct func_info_t*)s->pdata)->name,
-                ((struct func_info_t*)s->pdata)->addr
-              );
+        printf("%s : %x\n",
+               ((struct func_info_t*)s->pdata)->name,
+               ((struct func_info_t*)s->pdata)->addr);
         s = s->next;
     }
+    printf("===hints===\n");
 
     return h;
 }
