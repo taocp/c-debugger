@@ -1,4 +1,4 @@
-CFLAGS=-g -Wall
+CFLAGS=-g -Wall -gdwarf-2
 
 all:debugger traced
 
